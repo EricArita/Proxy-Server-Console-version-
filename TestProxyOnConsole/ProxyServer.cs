@@ -8,69 +8,17 @@ using System.Text;
 using System.Threading.Tasks;
 using System.IO;
 using System.Diagnostics;
+using System.IO.Compression;
+using System.Net.Security;
 
 namespace TestProxyOnConsole
 {
-    public class ProxyServer : IDisposable
+    public class ProxyServer
     {
-        //ISettings Implementation
-
-        public void LoadSettings(KeyValuePair<string, string> kvp)
-        {
-            string key = kvp.Key.ToLower();
-            string value = kvp.Value.ToLower();
-
-            if (key == "auto_allow") autoAllow = (value == "true") ? true : false;
-            if (key == "http_mode") SetMode(StringToMode(value), "http");
-            if (key == "https_mode") SetMode(StringToMode(value), "https");
-        }
-
-        public void WriteSettings(System.Xml.XmlWriter xml)
-        {
-            xml.WriteStartElement("settings_start");
-            xml.WriteElementString("auto_allow", (autoAllow) ? "true" : "false");
-            xml.WriteElementString("http_mode", ModeToString(httpMode));
-            xml.WriteElementString("https_mode", ModeToString(httpsMode));
-            xml.WriteEndElement();
-        }
-
-        //IDisposable implementation
-
-        bool disposed = false;
-        //SafeFileHandle handle = new SafeFileHandle(IntPtr.Zero, true);
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
-
-        protected virtual void Dispose(bool disposing)
-        {
-            if (disposed) return;
-            if (disposing)
-            {
-                //handle.Dispose();
-
-                if (started)
-                {
-                    StopServer();
-                    server.Dispose();
-                }
-     
-                clientList = null;
-            }
-
-            disposed = true;
-        }
-
-        //Proxy Server
-
         public enum Mode : int
         {
-            forward = 0,
-            MITM = 1,
-            Undefined = 2
+            Forward = 0,
+            Undefined = 1
         }
 
         Socket server;
@@ -113,18 +61,18 @@ namespace TestProxyOnConsole
         {
             server = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
            
-            IPEndPoint ep = null;
+            IPEndPoint IPEndpoint = null;
             byte[] buffer = new byte[1024];
 
             if (ipv4Addr != "")
-                ep = CreateEndPoint(ipv4Addr);
+                IPEndpoint = CreateEndPoint(ipv4Addr);
 
-            if (ep != null)
+            if (IPEndpoint != null)
             {
                 //Console.WriteLine("Step 0");   
 
                 started = true;
-                server.Bind(ep);
+                server.Bind(IPEndpoint);
                 server.Listen(pclimit);
                 server.BeginAccept(new AsyncCallback(AcceptClient), null);
             }
@@ -141,7 +89,7 @@ namespace TestProxyOnConsole
 
             clientList.Clear();
 
-            Console.WriteLine("Server shutdown Ok");
+            Console.WriteLine("Server shutdown...");
 
             if (started)
             {
@@ -174,7 +122,7 @@ namespace TestProxyOnConsole
             client.Dispose();
         }
 
-        public void CleanSockets()
+        public void CloseAllSockets()
         {
             List<Socket> copy = CopyList(clientList);
             bool result = true;
@@ -194,7 +142,7 @@ namespace TestProxyOnConsole
 
             if (result)
             {
-                Console.WriteLine("All clients disconnected from server");
+                Console.WriteLine("All clients are disconnected from server");
             }
             else
             {
@@ -219,15 +167,8 @@ namespace TestProxyOnConsole
             else return Mode.Undefined;
         }
 
-        public void PrintModes()
-        {
-            Console.WriteLine("==Proxy Server Protocol Modes==");
-            Console.WriteLine("HTTP: " + ModeToString(httpMode));
-            Console.WriteLine("HTTPs: " + ModeToString(httpsMode));
-            Console.WriteLine("");
-        }
-
         #endregion
+
 
         #region Private medthods
 
@@ -245,12 +186,119 @@ namespace TestProxyOnConsole
 
         private void AutoClean(object sender, EventArgs e)
         {
-            CleanSockets();
+            CloseAllSockets();
+        }
+
+        private string ServerDateTime()
+        {
+            string dayOfWeek = "", month = "";
+            string day = DateTime.UtcNow.Day.ToString();
+            string year = DateTime.UtcNow.Year.ToString();
+            string hour = DateTime.UtcNow.Hour <= 9 ? "0" + DateTime.UtcNow.Hour.ToString() : DateTime.UtcNow.Hour.ToString();
+            string minute = DateTime.UtcNow.Minute <= 9 ? "0" + DateTime.UtcNow.Minute.ToString() : DateTime.UtcNow.Minute.ToString();
+            string second = DateTime.UtcNow.Second <= 9 ? "0" + DateTime.UtcNow.Second.ToString() : DateTime.UtcNow.Second.ToString();
+
+            switch (DateTime.UtcNow.DayOfWeek.ToString())
+            {
+                case "Monday":
+                    dayOfWeek = "Mon";
+                    break;
+                case "Tuesday":
+                    dayOfWeek = "Tue";
+                    break;
+                case "Wednesday":
+                    dayOfWeek = "Wed";
+                    break;
+                case "Thusday":
+                    dayOfWeek = "Thu";
+                    break;
+                case "Friday":
+                    dayOfWeek = "Fri";
+                    break;
+                case "Saturday":
+                    dayOfWeek = "Sat";
+                    break;
+                case "Sunday":
+                    dayOfWeek = "Sun";
+                    break;
+            }
+
+            switch (DateTime.UtcNow.Month)
+            {
+                case 1:
+                    month = "January";
+                    break;
+                case 2:
+                    month = "February";
+                    break;
+                case 3:
+                    month = "Match";
+                    break;
+                case 4:
+                    month = "April";
+                    break;
+                case 5:
+                    month = "May";
+                    break;
+                case 6:
+                    month = "June";
+                    break;
+                case 7:
+                    month = "July";
+                    break;
+                case 8:
+                    month = "August";
+                    break;
+                case 9:
+                    month = "September";
+                    break;
+                case 10:
+                    month = "October";
+                    break;
+                case 11:
+                    month = "November";
+                    break;
+                case 12:
+                    month = "December";
+                    break;
+            }
+
+            return dayOfWeek + ", " + day + " " + month + " " + year + " " + hour + ":" + minute + ":" + second + " GMT";
+        }
+
+        private void Response403Forbidden(Socket client)
+        {
+            string html = "<!DOCTYPE HTML>\r\n<html>\r\n<body>\r\n<h1 align='center'>403 Forbidden</h1>\r\n</body>\r\n</html>";
+            string resHeader = "";
+            
+            resHeader += "HTTP/1.1 403 Forbidden\r\n";
+            resHeader += "Date: " + ServerDateTime() + "\r\n";
+            resHeader += "Server: Apache\r\n";
+            resHeader += "Content-Encoding:\r\n";
+            resHeader += "Content-Length: " + html.Length + "\r\n";
+            resHeader += "Content-Type: text/html; charset = iso - 8859 - 1\r\n\r\n";
+            resHeader += html;
+
+            //byte[] uncompressedBytes = Encoding.ASCII.GetBytes(resHeader);
+            //byte[] encode = null;
+            //using (MemoryStream ms = new MemoryStream())
+            //{
+            //    using (GZipStream gs = new GZipStream(ms, CompressionMode.Compress))
+            //    {
+            //        gs.Write(uncompressedBytes, 0, uncompressedBytes.Length);
+            //    }
+
+            //    encode = ms.ToArray();
+            //}         
+
+            byte[] encode = Encoding.ASCII.GetBytes(resHeader);
+            client.Send(encode, 0, encode.Length, SocketFlags.None);
         }
 
         private void AcceptClient(IAsyncResult ar)
         {
             Socket client = null;
+            bool allow;
 
             try
             {
@@ -264,15 +312,10 @@ namespace TestProxyOnConsole
             IPEndPoint client_ep = (IPEndPoint)client.RemoteEndPoint;
             string remoteAddress = client_ep.Address.ToString();
             string remotePort = client_ep.Port.ToString();
-            //Console.Write(remoteAddress + " " + remotePort);
-
-            //TODO: Implement block command -> keep the server and existing connections alive, but drop new connections
-
-            bool allow;
-
+          
             if (!autoAllow)
             { 
-                Console.WriteLine("\n[IN] Connection " + remoteAddress + ":" + remotePort + "\nDo you want to allow connection?");
+                Console.WriteLine("\n[IN] Connection " + remoteAddress + ":" + remotePort + "\nDo you want to allow this connection?");
                 string answer = Console.ReadLine();
 
                 allow = answer == "yes" ? true : false;
@@ -295,7 +338,7 @@ namespace TestProxyOnConsole
             }
             else
             {
-                KillSocket(client, !stopping);
+                KillSocket(client);
                 Console.WriteLine("[REJECT] " + remoteAddress + ":" + remotePort);
             }
 
@@ -312,12 +355,12 @@ namespace TestProxyOnConsole
             try
             {
                 //Console.WriteLine("Step 2");
-                read = client.EndReceive(ar);     
+                read = client.EndReceive(ar);
             }
             catch (Exception)
             {
                 KillSocket(client, !stopping);
-                Console.WriteLine("[DISCONNECT] Client Disconnected from server");
+                Console.WriteLine("[DISCONNECT] Client disconnected from server");
                 return;
             }
 
@@ -338,92 +381,54 @@ namespace TestProxyOnConsole
 
                 return;
             }
-
+        
             string requestHeader = Encoding.ASCII.GetString(buffer, 0, read);
             //Console.WriteLine(requestHeader);
 
+            #region Check blacklist
+
             foreach (var key in ConfigurationManager.AppSettings.AllKeys)
             {
-                
                 if (requestHeader.Contains(ConfigurationManager.AppSettings[key].ToString()))
-                {                   
-                    string ForbiddenHtmlPageFilePath = Directory.GetCurrentDirectory() + @"\403Forbidden.html";
-                    Console.WriteLine(ForbiddenHtmlPageFilePath);
-
-                    if (File.Exists(ForbiddenHtmlPageFilePath))
-                    {
-                        //Console.WriteLine(ConfigurationManager.AppSettings[key].ToString());
-                        Console.WriteLine(ForbiddenHtmlPageFilePath);
-                        Process.Start(ForbiddenHtmlPageFilePath);
-                    }
-
-                    return;                 
-                }
-            }
-             
-         
-            Request req;
-            bool sslHandlerStarted = false;
-
-            if (obj.request != null)
-            {
-                if (obj.request.notEnded)
                 {
-                    string des = obj.request.full;
-                    des += requestHeader;
-                    req = new Request(des);
+                    Response403Forbidden(client);
+                    return;
                 }
-                else req = new Request(requestHeader);
             }
-            else
-                req = new Request(requestHeader);
+            #endregion
+
+            Request req = new Request(requestHeader); 
+            //bool sslHandlerStarted = false;
+                
 
             //Console.WriteLine("Step 3");
-            //Console.WriteLine(requestHeader);
 
-            if (!req.notEnded && !req.bogus)
+            Tunnel tunnel = new Tunnel(Tunnel.Mode.HTTPs, httpMode, httpsMode, ref client);
+            tunnel.CreateMinimalTunnel(req);
+
+            if (tunnel.sslRead && httpsMode == Mode.Forward) //Handle HTTPS normal
             {
-                Tunnel t = new Tunnel(Tunnel.Mode.HTTP, httpMode, httpsMode, ref client);
-                t.CreateMinimalTunnel(req);
-
-                if (t.Forbidden)
-                {
-                    //Console.WriteLine("Success forbidden");
-                    return;
-                }
-
-                if (t.sslRead && httpsMode == Mode.forward) //Handle HTTPS normal
-                {
-                    //Console.WriteLine("I'm HTTPS");
-                    //Console.WriteLine(requestHeader);
-                    //Console.WriteLine("Step 4");
-                    t.InitHTTPS(client);
-                  
-                    return;
-                }
-                else if (httpMode == Mode.forward) //Handle HTTP normal
-                {
-                    //Console.WriteLine("I'm NOT HTTPS");
-                    //Console.WriteLine(requestHeader); 
-                    t.SendHTTP(req, client);
-                   
-                    return;
-                }
+               //Console.WriteLine("Step 4");
+                 tunnel.SendHTTPS(client);               
+                 return;
             }
-            else if (req.notEnded) obj.request = req;
-
+            else if (httpMode == Mode.Forward) //Handle HTTP normal
+            {
+                tunnel.SendHTTP(req, client);               
+                return;               
+            }          
 
             Array.Clear(buffer, 0, buffer.Length);
 
-            try {
-                if (client.Connected && !sslHandlerStarted)
-                    client.BeginReceive(obj.buffer, 0, obj.buffer.Length, SocketFlags.None, new AsyncCallback(ReadPackets), obj);
-            }
-            catch (Exception e)
-            {
-                KillSocket(client, !stopping);
-                Console.WriteLine("Client aborted session!" + Environment.NewLine + e.Message);
-            }
+            //try {
+            //    if (client.Connected && !sslHandlerStarted)
+            //        client.BeginReceive(obj.buffer, 0, obj.buffer.Length, SocketFlags.None, new AsyncCallback(ReadPackets), obj);
+            //}
+            //catch (Exception e)
+            //{
+            //    KillSocket(client, !stopping);
+            //    Console.WriteLine("Client aborted session!" + Environment.NewLine + e.Message);
+            //}
         }
 
         private IPEndPoint CreateEndPoint(string ep_addr)
@@ -447,26 +452,6 @@ namespace TestProxyOnConsole
             }
 
             return result;
-        }
-
-        #endregion
-
-        #region Public static methods
-
-        public static Mode StringToMode(string input)
-        {
-            input = input.ToLower();
-
-            if (input == "mitm" || input == "man-in-the-middle") return Mode.MITM;
-            else if (input == "forward" || input == "normal") return Mode.forward;
-            return Mode.Undefined;
-        }
-
-        public static string ModeToString(Mode mode)
-        {
-            if (mode == Mode.forward) return "forward";
-            else if (mode == Mode.MITM) return "mitm";
-            else return "undefined";
         }
 
         #endregion

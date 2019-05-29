@@ -49,7 +49,6 @@
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="ProxyServer.cs" />
     <Compile Include="Request.cs" />
-    <Compile Include="Response.cs" />
     <Compile Include="Tunnel.cs" />
     <Compile Include="VDictionary.cs" />
   </ItemGroup>

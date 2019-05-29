@@ -2,7 +2,7 @@
 
 namespace TestProxyOnConsole
 {
-    public class Request : IDisposable
+    public class Request
     {
         public string full;
         public bool bogus = false;
@@ -13,12 +13,6 @@ namespace TestProxyOnConsole
         public string htmlBody;
         public VDictionary headers = new VDictionary();
         private bool disposed = false;
-
-        public void Dispose()
-        {
-            Dispose(true);
-            GC.SuppressFinalize(this);
-        }
 
         protected virtual void Dispose(bool disposing)
         {
@@ -53,18 +47,18 @@ namespace TestProxyOnConsole
                 return;
             }
 
-            if (!full.EndsWith("\r\n\r\n") && fromSslStream) notEnded = true; //setting only when requests are marked to allow normal (not MITM) https packets even if they are not ending with \r\n\r\n
+            if (!full.EndsWith("\r\n\r\n") && fromSslStream) notEnded = true; 
 
             try
             {
                 string infoLine = full.Split('\n')[0].Replace("\r", String.Empty);
                 //Console.WriteLine(infoLine);
-                string[] iParts = infoLine.Split(' ');
+                string[] infoParts = infoLine.Split(' ');
 
                 // request line of request message header
-                method = iParts[0];
-                target = iParts[1];
-                version = iParts[2];
+                method = infoParts[0];
+                target = infoParts[1];
+                version = infoParts[2];
 
                 headers = new VDictionary();
                 string[] data = full.Split('\n');
